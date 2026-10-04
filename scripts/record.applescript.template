@@ -1,0 +1,23 @@
+-- Claude VoiceOver keys: record
+-- First press: mute VoiceOver speech, three loud beeps as a countdown, then dictation starts, and VoiceOver
+-- stays quiet while you speak so it doesn't read your words back over you. Second press: stop dictation
+-- (if it is still going), unmute VoiceOver and say "Stopped". A flag file remembers that this script muted
+-- VoiceOver, so the second press always unmutes, however the recording ended.
+set T to quoted form of "@CLAUDEVO@"
+set flag to POSIX path of (path to home folder) & ".claudevo-muted"
+set isMuted to (do shell script "test -e " & quoted form of flag & " && echo yes || echo no") is "yes"
+if isMuted then
+	if (do shell script T & " recordstate") is "stop" then do shell script T & " record"
+	do shell script "rm -f " & quoted form of flag
+	tell application "VoiceOver" to tell commander to perform command "mute speech toggle"
+	delay 0.3
+	tell application "VoiceOver" to output "Stopped"
+else
+	do shell script "touch " & quoted form of flag
+	tell application "VoiceOver" to tell commander to perform command "mute speech toggle"
+	do shell script T & " record --at 1.1 > /dev/null 2>&1 &"
+	repeat 3 times
+		do shell script "afplay -v 6 /System/Library/Sounds/Ping.aiff > /dev/null 2>&1 &"
+		delay 0.4
+	end repeat
+end if

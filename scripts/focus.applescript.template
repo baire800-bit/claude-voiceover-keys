@@ -1,0 +1,3 @@
+-- Claude VoiceOver keys: @NAME@
+set toolPath to "@CLAUDEVO@"
+do shell script quoted form of toolPath & " @CMD@ > /dev/null 2>&1 &"

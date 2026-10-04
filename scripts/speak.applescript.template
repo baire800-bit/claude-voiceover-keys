@@ -1,0 +1,4 @@
+-- Claude VoiceOver keys: @NAME@
+set toolPath to "@CLAUDEVO@"
+set msg to do shell script quoted form of toolPath & " @CMD@ --print"
+tell application "VoiceOver" to output msg
