@@ -80,3 +80,9 @@ It removes only the keys and files this installer added, and keeps your VoiceOve
 - uninstall.sh: removes everything the installer added.
 - src/claudevo.swift: the tool's source code.
 - scripts: templates for the VoiceOver scripts the installer creates.
+
+## Feedback
+
+Found a problem, or have an idea for another key? Please open an issue on this project's Issues page: https://github.com/baire800-bit/claude-voiceover-keys/issues
+
+It helps to say which key you pressed, what VoiceOver said, and which version of macOS you're using.
