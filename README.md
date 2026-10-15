@@ -18,6 +18,7 @@ All of these are your VoiceOver Option key plus a letter.
 - B: move to the session you're in, in the sidebar.
 - C: move to the Chat and Cowork / Code buttons.
 - O: move to Routines.
+- S: show or hide the session rail, the panel of session details (Environment, Context, Connectors) beside the conversation. VoiceOver says "Session rail on" or "Session rail off". With the rail hidden, moving by heading with VoiceOver goes through the conversation without stopping in the panel.
 - L: listen to Claude's latest reply.
 - W: hear all your sessions, grouped: waiting for you first, then running, then idle.
 - I: hear this session's model, effort, permission mode and usage.
@@ -86,3 +87,7 @@ It removes only the keys and files this installer added, and keeps your VoiceOve
 - uninstall.sh: removes everything the installer added.
 - src/claudevo.swift: the tool's source code.
 - scripts: templates for the VoiceOver scripts the installer creates.
+
+## Changes
+
+Version 1.1, 15 October 2026. Added S, which shows or hides the session rail that Claude app version 2.42304 put beside the conversation. Fixed W for the new sidebar layout in that version. It now also lists sessions with a new reply. Fixed L, which had started reading the message time and "Chat mode" at the end of the reply. To update, run the installer again. Your other keys stay as they are.

@@ -18,6 +18,7 @@ KEYS=(
   "b:sidebar:Sidebar:focus"
   "c:mode:Chat or Code mode:focus"
   "o:routines:Routines:focus"
+  "s:rail:Session rail:speak"
   "l:speak:Listen to latest reply:speak"
   "w:waiting:Who is waiting:speak"
   "i:info:Session info:speak"

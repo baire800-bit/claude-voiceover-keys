@@ -5,6 +5,7 @@
 //   sidebar    move focus to the open session in the sidebar
 //   mode       move focus to the Chat and Cowork / Code buttons
 //   routines   move focus to Routines
+//   rail       show or hide the session rail (the details panel beside the chat) and say which; --state only reports it
 //   speak      print or announce Claude's latest reply
 //   waiting    print or announce which sessions are running or waiting for you
 //   info       print or announce model, effort, permission mode and usage
@@ -39,7 +40,7 @@ func announce(_ text: String) {
 func emit(_ t: String) { if printMode { print(t) } else { announce(t) } }
 
 if cmd.isEmpty || cmd == "help" {
-    print("usage: claudevo prompt|sidebar|mode|routines|speak|waiting|info|session|record|recordstate|say TEXT [--print]")
+    print("usage: claudevo prompt|sidebar|mode|routines|rail|speak|waiting|info|session|record|recordstate|say TEXT [--print]")
     exit(0)
 }
 if cmd == "say" { announce(args.dropFirst(2).filter { $0 != "--print" }.joined(separator: " ")); exit(0) }
@@ -107,13 +108,24 @@ case "routines":
     if let r = flat.first(where: { str($0, kAXRoleAttribute) == "AXButton" && str($0, kAXTitleAttribute) == "Routines" }), focus(r) { } else { emit("Routines not found") }
 
 case "speak":
+    // Skip the message's action toolbar (its "2 hours ago" time) and hidden status regions ("Chat mode").
+    func insideChrome(_ e: AXUIElement) -> Bool {
+        var cur: AXUIElement? = e
+        for _ in 0..<8 {
+            guard let c = cur, let p = attr(c, kAXParentAttribute) else { return false }
+            let pe = p as! AXUIElement
+            if str(pe, kAXRoleAttribute) == "AXToolbar" || str(pe, kAXSubroleAttribute) == "AXApplicationStatus" { return true }
+            cur = pe
+        }
+        return false
+    }
     guard let i = flat.lastIndex(where: { str($0, kAXRoleAttribute) == "AXHeading" && str($0, kAXTitleAttribute).hasPrefix("Claude responded") }) else { emit("No reply found"); break }
     var parts: [String] = []
     for e in flat[(i + 1)...] {
         let role = str(e, kAXRoleAttribute)
         if role == "AXHeading" && str(e, kAXTitleAttribute).hasPrefix("You said") { break }
         if role == "AXTextArea" && str(e, kAXDescriptionAttribute) == "Prompt" { break }
-        if role == "AXStaticText" && !insideButton(e) {
+        if role == "AXStaticText" && !insideButton(e) && !insideChrome(e) {
             let v = str(e, kAXValueAttribute).trimmingCharacters(in: .whitespacesAndNewlines)
             if !v.isEmpty && !v.hasPrefix("Claude responded") { parts.append(v) }
         }
@@ -123,20 +135,37 @@ case "speak":
 case "waiting":
     // Every session in the sidebar, grouped by status: waiting for you, running, any other status
     // (such as "Something went wrong"), then idle. The status is the description of the row's first child.
-    var order: [String] = ["Awaiting input", "Running"]
+    var order: [String] = ["Awaiting input", "Unread response", "Running"]
     var groups: [String: [String]] = [:]
+    // Since app version 2.42304 (October 2026) the row's title is just the session name and the status is
+    // spoken text inside a status region in the row ("Unread response", "Running" and so on); no status means idle.
+    // Older versions put the status in front of the title and in the description of the row's first child.
+    func statusText(_ e: AXUIElement, _ d: Int = 0) -> String? {
+        if str(e, kAXSubroleAttribute) == "AXApplicationStatus" {
+            var t: [String] = []
+            func collect(_ x: AXUIElement) { let v = str(x, kAXValueAttribute); if !v.isEmpty { t.append(v) }; for c in kids(x) { collect(c) } }
+            collect(e)
+            return t.joined(separator: " ")
+        }
+        if d < 6 { for c in kids(e) { if let s = statusText(c, d + 1) { return s } } }
+        return nil
+    }
     for b in sessionButtons {
         let t = str(b, kAXTitleAttribute)
-        guard let first = kids(b).first else { continue }
-        let st = str(first, kAXDescriptionAttribute)
-        guard !st.isEmpty, t.hasPrefix(st + " ") else { continue }
-        let name = String(t.dropFirst(st.count + 1))
+        var st = "", name = t
+        if let first = kids(b).first, case let old = str(first, kAXDescriptionAttribute), !old.isEmpty, t.hasPrefix(old + " ") {
+            st = old; name = String(t.dropFirst(old.count + 1))
+        } else {
+            st = statusText(b) ?? ""
+            if st.isEmpty { st = "Idle" }
+        }
+        guard !name.isEmpty else { continue }
         if name == "Routines" { continue }
         if !order.contains(st) && st != "Idle" { order.append(st) }
         groups[st, default: []].append(name + (name == currentSession ? " (this one)" : ""))
     }
     order.append("Idle")
-    let labels = ["Awaiting input": "Waiting for you"]
+    let labels = ["Awaiting input": "Waiting for you", "Unread response": "New reply"]
     let parts = order.compactMap { st in groups[st].map { "\(labels[st] ?? st): \($0.joined(separator: ", "))" } }
     emit(parts.isEmpty ? "No sessions found" : parts.joined(separator: ". "))
 
@@ -155,6 +184,17 @@ case "session":
     let folder = flat.first { str($0, kAXRoleAttribute) == "AXPopUpButton" && str($0, kAXDescriptionAttribute).isEmpty
         && !str($0, kAXTitleAttribute).isEmpty && !classes($0).contains("df-user-menu-btn") && !composerControls.contains($0) }
     emit(currentSession.isEmpty ? "Session name not found" : "You're in \(currentSession)" + (folder.map { ", folder \(str($0, kAXTitleAttribute))" } ?? ""))
+
+case "rail":
+    // The session rail is the panel of session details (Environment, Context, Connectors) beside the chat.
+    // Its toolbar toggle is labelled "Show session rail"; AXValue 1 means the rail is showing.
+    guard let t = flat.first(where: { str($0, kAXRoleAttribute) == "AXCheckBox" && str($0, kAXDescriptionAttribute).lowercased().contains("session rail") }) else { emit("Session rail button not found"); break }
+    let wasOn = (attr(t, kAXValueAttribute) as? Int) == 1
+    if CommandLine.arguments.contains("--state") { emit(wasOn ? "Session rail is on" : "Session rail is off"); break }
+    AXUIElementPerformAction(t, kAXPressAction as CFString)
+    Thread.sleep(forTimeInterval: 0.4)
+    let nowOn = (attr(t, kAXValueAttribute) as? Int).map { $0 == 1 } ?? !wasOn
+    emit(nowOn ? "Session rail on" : "Session rail off")
 
 case "recordstate":
     print(composerControls.contains(where: isStopDictation) ? "stop" : "start")
