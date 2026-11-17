@@ -5,7 +5,12 @@
 -- VoiceOver, so the second press always unmutes, however the recording ended.
 set T to quoted form of "@CLAUDEVO@"
 set flag to POSIX path of (path to home folder) & ".claudevo-muted"
-set isMuted to (do shell script "test -e " & quoted form of flag & " && echo yes || echo no") is "yes"
+-- The flag holds VoiceOver's process number. If VoiceOver has restarted since (a crash, a log out, or Command-F5
+-- twice), its speech is no longer muted, so the flag is stale: it is removed and this press starts a fresh recording.
+set voPid to do shell script "pgrep -x VoiceOver | head -1 || true"
+set flagPid to do shell script "cat " & quoted form of flag & " 2>/dev/null || echo none"
+set isMuted to (flagPid is not "none") and (flagPid is voPid)
+if (flagPid is not "none") and not isMuted then do shell script "rm -f " & quoted form of flag
 if isMuted then
 	if (do shell script T & " recordstate") is "stop" then do shell script T & " record"
 	do shell script "rm -f " & quoted form of flag
@@ -13,7 +18,7 @@ if isMuted then
 	delay 0.3
 	tell application "VoiceOver" to output "Stopped"
 else
-	do shell script "touch " & quoted form of flag
+	do shell script "echo " & quoted form of voPid & " > " & quoted form of flag
 	tell application "VoiceOver" to tell commander to perform command "mute speech toggle"
 	do shell script T & " record --at 1.1 > /dev/null 2>&1 &"
 	repeat 3 times

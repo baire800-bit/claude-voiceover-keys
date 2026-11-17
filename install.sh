@@ -6,15 +6,19 @@
 #     from any app.
 #   VoiceOver Option keys: VoiceOver's own Option Key commands run the keys, as in version 1. Nothing else to
 #     install, but the keys apply in every app and can clash with other apps' Option keys.
-# Safe to run again. Options: --hotkeys or --commander to choose without being asked, --dry-run to change nothing.
+# Safe to run again. Options: --hotkeys or --commander to choose without being asked, --dry-run to change nothing,
+# --check to list key clashes and test the keys against the open Claude window without installing anything.
+# To use different letters or modifiers, copy keys.conf.example to ~/.config/claude-voiceover-keys/keys.conf, edit it,
+# and run the installer again.
 set -euo pipefail
 
-DRY=0; MODE=""
+DRY=0; MODE=""; CHECK=0
 for a in "$@"; do
   case "$a" in
     --dry-run) DRY=1 ;;
     --hotkeys) MODE=hotkeys ;;
     --commander) MODE=commander ;;
+    --check) CHECK=1 ;;
   esac
 done
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -28,7 +32,7 @@ KEYS=(
   "p:prompt:Message box:focus"
   "b:sidebar:Sidebar:focus"
   "c:mode:Chat or Code mode:focus"
-  "o:routines:Routines:focus"
+  "o:routines:Scheduled:focus"
   "s:rail:Session rail:speak"
   "l:speak:Listen to latest reply:speak"
   "w:waiting:Who is waiting:speak"
@@ -38,6 +42,40 @@ KEYS=(
 )
 # Keys that also work from any app in hotkey mode, with Option-Shift.
 GLOBAL=(w l r p)
+MOD="alt"; GMOD="alt + shift"
+# Your own choices, if you have made any, replace the defaults above. See keys.conf.example.
+KEYCONF="${CVK_KEYCONF:-$HOME/.config/claude-voiceover-keys/keys.conf}"
+if [[ -f "$KEYCONF" ]]; then
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line%%#*}"; [[ "$line" != *=* ]] && continue
+    k="$(echo "${line%%=*}" | tr -d '[:space:]')"; v="$(echo "${line#*=}" | sed 's/^ *//;s/ *$//')"
+    case "$k" in
+      modifier) MOD="$v" ;;
+      global_modifier) GMOD="$v" ;;
+      global) read -r -a GLOBAL <<< "$v" ;;
+      *) for i in "${!KEYS[@]}"; do
+           IFS=: read -r letter cmd name kind <<< "${KEYS[$i]}"
+           if [[ "$cmd" == "$k" ]]; then
+             if [[ -z "$v" || "$v" == "off" ]]; then unset 'KEYS[i]'
+             else KEYS[$i]="$(echo "$v" | tr '[:upper:]' '[:lower:]'):$cmd:$name:$kind"; fi
+           fi
+         done ;;
+    esac
+  done < "$KEYCONF"
+  KEYS=("${KEYS[@]}")
+  # Global keys are named by command in keys.conf (speak waiting record prompt); turn them into letters.
+  G2=(); for g in "${GLOBAL[@]:-}"; do
+    for entry in "${KEYS[@]}"; do IFS=: read -r l c n k <<< "$entry"; [[ "$c" == "$g" || "$l" == "$g" ]] && G2+=("$l") && break; done
+  done; GLOBAL=("${G2[@]:-}")
+fi
+# Control-Option is VoiceOver's own modifier, so keys on it would fight VoiceOver.
+for m in "$MOD" "$GMOD"; do
+  norm="$(echo "$m" | tr -d ' ' | tr '+' '\n' | sed 's/^[lr]//' | sort | tr '\n' '+')"
+  if [[ "$norm" == "alt+ctrl+" ]]; then echo "Control-Option is VoiceOver's own modifier, so it can't be used for these keys. Choose another in $KEYCONF."; exit 1; fi
+done
+# Letters must be unique.
+dups="$(for e in "${KEYS[@]}"; do echo "${e%%:*}"; done | sort | uniq -d | tr '\n' ' ')"
+if [[ -n "$dups" ]]; then echo "These letters are given to more than one key in $KEYCONF: $dups. Change one and run this again."; exit 1; fi
 BEGIN_MARK="# >>> Claude VoiceOver keys >>>"
 END_MARK="# <<< Claude VoiceOver keys <<<"
 
@@ -56,6 +94,50 @@ if ! xcrun --find swiftc >/dev/null 2>&1; then
 fi
 if [[ ! -d /Applications/Claude.app ]]; then
   say_line "Note: the Claude desktop app was not found in Applications. The keys will do nothing until it is installed."
+fi
+
+# Other programs that catch keys across the whole Mac can take these keys first, or lose theirs to them.
+other_hotkey_apps() {
+  local found=()
+  local running; running="$(ps -axo command= 2>/dev/null)"
+  for app in "Karabiner-Elements" "Hammerspoon" "BetterTouchTool" "Keyboard Maestro" "Raycast" "Alfred" "MaccessHub" "TurnOver" "com.turnover"; do
+    grep -qiF "$app" <<< "$running" && found+=("$app")
+  done
+  [[ ${#found[@]} -gt 0 ]] && echo "${found[*]}" | sed 's/com.turnover/TurnOver/; s/TurnOver TurnOver/TurnOver/' || true
+}
+# Say a key the way a person would: "alt + shift - w" becomes "Option-Shift-W".
+nice() {
+  local m="$1" l="$2" out=""
+  for part in $(echo "$m" | tr '+' ' '); do
+    case "$part" in alt|lalt|ralt) out+="Option-" ;; shift|lshift|rshift) out+="Shift-" ;; cmd|lcmd|rcmd) out+="Command-" ;;
+      ctrl|lctrl|rctrl) out+="Control-" ;; fn) out+="Fn-" ;; hyper) out+="Hyper-" ;; meh) out+="Meh-" ;; *) out+="$part-" ;; esac
+  done
+  echo "$out$(echo "$l" | tr '[:lower:]' '[:upper:]')"
+}
+list_keys() {
+  for entry in "${KEYS[@]}"; do IFS=: read -r letter cmd name kind <<< "$entry"; if [[ $MODE == commander ]]; then echo "  $(nice alt "$letter"): $name"; else echo "  $(nice "$MOD" "$letter") in Claude: $name"; fi; done
+  if [[ $MODE != commander ]]; then
+    for letter in "${GLOBAL[@]:-}"; do [[ -z "$letter" ]] && continue
+      for entry in "${KEYS[@]}"; do IFS=: read -r l c n k <<< "$entry"; [[ $l == "$letter" ]] && break; done
+      echo "  $(nice "$GMOD" "$letter") in any app: $n"; done
+  fi
+}
+if [[ $CHECK == 1 ]]; then
+  say_line "Checking keys. Nothing is installed or changed."
+  [[ -z "$MODE" ]] && MODE=hotkeys
+  list_keys
+  apps="$(other_hotkey_apps)"
+  [[ -n "$apps" ]] && echo "  These programs that catch keys are running, so check none of them uses the keys above: $apps."
+  for CONF in "${XDG_CONFIG_HOME:-$HOME/.config}/skhd/skhdrc" "$HOME/.skhdrc"; do
+    [[ -f "$CONF" ]] || continue
+    other="$(awk -v b="$BEGIN_MARK" -v e="$END_MARK" '$0==b{skip=1;next} $0==e{skip=0;next} !skip' "$CONF")"
+    for entry in "${KEYS[@]}"; do IFS=: read -r l c n k <<< "$entry"
+      grep -Eq "^[[:space:]]*$MOD[[:space:]]*-[[:space:]]*$l[[:space:]]*[:\[]" <<< "$other" && echo "  Clash: $(nice "$MOD" "$l") is already used in $CONF."
+    done
+  done
+  if [[ -x "$TOOL" ]]; then say_line "Testing the keys against the Claude window:"; "$TOOL" check --print || true
+  else echo "  The keys aren't installed yet, so the Claude window test is skipped."; fi
+  exit 0
 fi
 
 # Choose how the keys are run.
@@ -100,6 +182,8 @@ fi
 # 3. Install the VoiceOver scripts
 say_line "Installing the VoiceOver scripts."
 run mkdir -p "$SCRIPTDIR"
+# Routines was renamed Scheduled in the app, and in version 2.1 here.
+[[ $DRY == 0 ]] && rm -f "$SCRIPTDIR/Claude Routines.scpt"
 for entry in "${KEYS[@]}"; do
   IFS=: read -r letter cmd name kind <<< "$entry"
   tmpl="$HERE/scripts/$kind.applescript.template"
@@ -138,21 +222,20 @@ if [[ $DRY == 0 ]]; then
   cp "$VOPLIST" "$APPDIR/VoiceOver-settings-backup-$(date +%Y%m%d-%H%M%S).plist"
 fi
 assigned=(); skipped=(); failed=()
-if [[ $MODE == hotkeys ]]; then
-  # Take out any Option key commands an earlier version added, so VoiceOver doesn't catch the keys first.
+# Take out the Option key commands an earlier run added. In hotkey mode this stops VoiceOver catching the keys
+# first; with VoiceOver Option keys it clears letters you have since moved, and the current ones are added back below.
+if true; then
   if [[ -f "$VOPLIST" ]]; then
     for key in $(plutil -convert xml1 -o - "$VOPLIST" 2>/dev/null | grep -o 'custom.keyboard-commander.SCRKeyboardCommander_00[0-9a-f]*' || true); do
       val="$(defaults read "$VOPLIST" "$key" 2>/dev/null || true)"
       if [[ "$val" == *"$SCRIPTDIR"* ]]; then
         if [[ $DRY == 1 ]]; then echo "  would remove VoiceOver Option key command $key"
-        else defaults delete "$VOPLIST" "$key" && echo "  Removed the old VoiceOver Option key command $key."; fi
+        else defaults delete "$VOPLIST" "$key"; fi
       fi
     done
   fi
-  KEYS_FOR_COMMANDER=()
-else
-  KEYS_FOR_COMMANDER=("${KEYS[@]}")
 fi
+if [[ $MODE == hotkeys ]]; then KEYS_FOR_COMMANDER=(); else KEYS_FOR_COMMANDER=("${KEYS[@]}"); fi
 for entry in "${KEYS_FOR_COMMANDER[@]:-}"; do
   [[ -z "$entry" ]] && continue
   IFS=: read -r letter cmd name kind <<< "$entry"
@@ -209,15 +292,14 @@ if [[ $MODE == hotkeys ]]; then
   BLOCK="$BEGIN_MARK"$'\n'"# Added by the Claude VoiceOver keys installer. Run install.sh again to rewrite, uninstall.sh to remove."
   for entry in "${KEYS[@]}"; do
     IFS=: read -r letter cmd name kind <<< "$entry"
-    if taken "alt - $letter"; then echo "  Option $letter is already used in your hotkeys, so $name was not assigned."; continue; fi
-    BLOCK+=$'\n'"alt - $letter ["$'\n'"    \"claude\" : osascript \"$SCRIPTDIR/Claude $name.scpt\""$'\n'"    * ~"$'\n'"]"
-    echo "  Option $letter in Claude: $name"
+    if taken "$MOD - $letter"; then echo "  $(nice "$MOD" "$letter") is already used in your hotkeys, so $name was not assigned."; continue; fi
+    BLOCK+=$'\n'"$MOD - $letter ["$'\n'"    \"claude\" : osascript \"$SCRIPTDIR/Claude $name.scpt\""$'\n'"    * ~"$'\n'"]"
   done
-  for letter in "${GLOBAL[@]}"; do
+  for letter in "${GLOBAL[@]:-}"; do
+    [[ -z "$letter" ]] && continue
     for entry in "${KEYS[@]}"; do IFS=: read -r l cmd name kind <<< "$entry"; [[ $l == "$letter" ]] && break; done
-    if taken "alt \+ shift - $letter"; then echo "  Option-Shift $letter is already used in your hotkeys, so it was not assigned."; continue; fi
-    BLOCK+=$'\n'"alt + shift - $letter : osascript \"$SCRIPTDIR/Claude $name.scpt\""
-    echo "  Option-Shift $letter in any app: $name"
+    if taken "${GMOD//+/\\+} - $letter"; then echo "  $(nice "$GMOD" "$letter") is already used in your hotkeys, so it was not assigned."; continue; fi
+    BLOCK+=$'\n'"$GMOD - $letter : osascript \"$SCRIPTDIR/Claude $name.scpt\""
   done
   BLOCK+=$'\n'"$END_MARK"
   if [[ $DRY == 0 ]]; then
@@ -238,6 +320,14 @@ if [[ $MODE == hotkeys ]]; then
   fi
 fi
 
+# 4c. Warn about other programs that catch keys.
+apps="$(other_hotkey_apps)"
+if [[ -n "$apps" ]]; then
+  say_line "Heads up: these programs that catch keys are running: $apps."
+  echo "  If one of them uses any of the keys above, one side will win and the other will go quiet."
+  echo "  To change a Claude key, see keys.conf.example in this folder. To list the keys and test them: bash install.sh --check"
+fi
+
 # 5. Permissions
 if [[ $MODE == hotkeys ]]; then
   say_line "Permissions: skhd needs Accessibility to hear the keys, and claudevo needs it to move around Claude."
@@ -250,7 +340,7 @@ fi
 say_line "Last step: turn VoiceOver off and on again (Command-F5 twice) so it picks up the changes."
 echo "  If you gave Terminal Full Disk Access for this, you can switch it off again now in Privacy and Security, Full Disk Access."
 if [[ $MODE == hotkeys ]]; then
-  say_line "Done. In Claude, hold either Option key and press a letter. From any app, hold Option and Shift and press W, L, R or P."
+  say_line "Done. Your keys:"; list_keys
 else
-  say_line "Done. Hold your VoiceOver Option key (Right, Left or either, as set in VoiceOver Utility, Commands) and press a letter."
+  say_line "Done. Hold your VoiceOver Option key (Right, Left or either, as set in VoiceOver Utility, Commands) and press a letter:"; list_keys
 fi

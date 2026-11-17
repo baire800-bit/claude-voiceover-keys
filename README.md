@@ -24,12 +24,12 @@ All of these are Option plus a letter, in the Claude app.
 
 - P: move to the message box.
 - B: move to the session you're in, in the sidebar.
-- C: move to the Chat and Cowork / Code buttons.
-- O: move to Routines.
+- C: move to the Claude and Code buttons at the top of the window.
+- O: move to Scheduled (called Routines in older versions of the app).
 - S: show or hide the session rail, the panel of session details (Environment, Context, Connectors) beside the conversation. VoiceOver says "Session rail on" or "Session rail off". With the rail hidden, moving by heading with VoiceOver goes through the conversation without stopping in the panel.
 - L: listen to Claude's latest reply.
 - W: hear all your sessions, grouped: waiting for you first, then running, then idle.
-- I: hear this session's model, effort, permission mode and usage.
+- I: hear this session's model, effort, permission mode, how much of its context is used (when the session rail is showing) and your usage.
 - H: hear which session you're in, and its folder.
 - R: start dictation, and press again to stop. On the first press VoiceOver goes quiet, you hear three beeps, and recording starts after the third, so VoiceOver doesn't talk over you or get typed into your message. On the second press, recording stops and VoiceOver says "Stopped".
 
@@ -41,6 +41,18 @@ With hotkeys, these also work from any app:
 - Option-Shift-P: move to Claude's message box.
 
 If one of these keys is already in use, in your skhd hotkeys or your VoiceOver Option key commands, the installer leaves it alone and tells you which ones it skipped.
+
+## If a key clashes with something else
+
+Plenty of other programs want Option and a letter: games, other screen reader add-ons, and tools like Karabiner, Keyboard Maestro, Raycast or Hammerspoon. When two programs want the same key, one wins and the other goes quiet, and nothing tells you which. So you can change any of these keys.
+
+1. Copy keys.conf.example from this folder to a folder called claude-voiceover-keys inside .config in your home folder, and name the copy keys.conf. In Terminal, from this folder: mkdir -p ~/.config/claude-voiceover-keys && cp keys.conf.example ~/.config/claude-voiceover-keys/keys.conf
+2. Open it in TextEdit and follow the notes inside. Each key is one line, such as mode = k to move the Claude and Code key to Option-K. With hotkeys, you can also change Option to another modifier, change which keys work from any app, or switch any key off.
+3. Run the installer again. It reads your file, and the keys follow it from then on, including after updates.
+
+To hear the keys you have, whether any clash with your other skhd hotkeys, which key-catching programs are running, and whether each key can find what it needs in the Claude window, run: bash install.sh --check. It changes nothing. It's also the first thing to run if a key stops working after a Claude app update.
+
+Two clashes are worth knowing about before you start. In a text field, Option with a letter types a special character, such as Option-P for pi. In Claude, these keys take those over. The Option-Shift keys do the same in every app, so if you type accents or symbols that way, change global_modifier or switch the global keys off. And Control-Option is VoiceOver's own modifier, so the installer won't use it.
 
 ## Before you install
 
@@ -91,9 +103,10 @@ It removes only the keys and files this installer added, including the Claude bl
 
 ## Good to know
 
-- The keys find things in the Claude app by their accessibility labels, such as "Prompt" and "Press and hold to record". If an app update renames one, that key stops working until this is updated.
+- The keys find things in the Claude app by their accessibility labels, such as "Prompt" and "Press and hold to record". If an app update renames one, that key stops working until this is updated. bash install.sh --check tells you which key has lost its target, and an issue saying so helps get it fixed quickly.
 - Because of that, the keys only work with the Claude app in English.
-- Running the installer again only rebuilds claudevo when its source code has changed. A rebuild can make macOS forget claudevo's Accessibility permission. If a key says it needs permission, switch claudevo off and on again in Privacy and Security, Accessibility.
+- Running the installer again only rebuilds claudevo when its source code has changed. With hotkeys, claudevo runs under skhd's Accessibility permission, so a rebuild doesn't need a new one. With VoiceOver Option keys, a rebuild can make macOS forget claudevo's permission. If a key says it needs permission, switch claudevo off and on again in Privacy and Security, Accessibility.
+- Dictation with R mutes VoiceOver while you speak. If VoiceOver restarts during a recording, the next press of R starts a fresh recording rather than trying to stop the old one.
 - With hotkeys, if no key does anything and macOS never asked, check that skhd is switched on in Privacy and Security, Accessibility. If you update skhd, macOS can forget that permission, so switch it off and on again.
 - The hotkeys recognise Claude by its app name, so they only fire while the Claude desktop app is in front.
 - Nothing here types for you or opens other apps. The tool uses the macOS accessibility interface to move focus and read labels, and VoiceOver's own scripting to speak.
@@ -103,10 +116,13 @@ It removes only the keys and files this installer added, including the Claude bl
 - install.sh: the installer.
 - Install.command: open this from Finder (Command-Down Arrow) to run the installer.
 - uninstall.sh: removes everything the installer added.
+- keys.conf.example: a starting point for choosing your own keys.
 - src/claudevo.swift: the tool's source code.
 - scripts: templates for the VoiceOver scripts the installer creates.
 
 ## Changes
+
+Version 2.1, 17 November 2026. Fixed for Claude app version 5.11 on macOS 27. W read every session as idle and included the sidebar's own buttons and the session rail; it now groups sessions properly again. B landed on New instead of the session you're in. C and O had stopped working because the app renamed Chat and Cowork to Claude, and Routines to Scheduled. H now says the session's folder again. I adds how much of the context is used. R no longer gets stuck saying "Stopped" without recording after VoiceOver restarts. New: choose your own keys and modifiers in keys.conf, and bash install.sh --check to hear your keys, find clashes and test that every key works. The installer also warns when another key-catching program is running. To update, run the installer again.
 
 Version 2.0, 15 November 2026. The installer now offers hotkeys through the free skhd program, as well as VoiceOver's Option key commands. With hotkeys, Option plus a letter works only in Claude, so other apps keep their own Option keys, and either Option key works. Option-Shift with W, L, R or P works from any app. If you already have version 1, run the installer again and choose hotkeys. It moves your keys over and removes the old Option key commands. To stay as you are, choose VoiceOver Option keys.
 

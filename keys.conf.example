@@ -1,0 +1,33 @@
+# Claude VoiceOver keys: your own key choices.
+# To use this, copy it to ~/.config/claude-voiceover-keys/keys.conf, change what you need, and run the installer
+# again. Anything you leave out keeps its usual key. Lines starting with # are ignored.
+#
+# Each key is the command name, an equals sign, and a letter. To switch a key off, leave the letter out
+# or write off. A letter can only be used once.
+#
+# prompt = p      move to the message box
+# sidebar = b     move to the session you're in, in the sidebar
+# mode = c        move to the Claude and Code buttons
+# routines = o    move to Scheduled
+# rail = s        show or hide the session rail
+# speak = l       listen to Claude's latest reply
+# waiting = w     hear all your sessions
+# info = i        hear the model, effort, permission mode, context and usage
+# session = h     hear which session you're in, and its folder
+# record = r      start or stop dictation
+#
+# With hotkeys you can also change the modifier keys. Use skhd's names: alt is Option, cmd is Command,
+# ctrl is Control, shift is Shift, joined with +. With VoiceOver Option keys only the letters can change.
+# Control-Option on its own is VoiceOver's modifier, so the installer won't use it. Before choosing, think about
+# Option-Shift and Option with a letter: in a text field they type special characters, such as Option-Shift-P for
+# a capital pi, and these keys take them over (in Claude only for the modifier, in every app for global_modifier).
+#
+# modifier = alt              the keys that work in Claude only
+# global_modifier = alt + shift   the keys that work from any app
+#
+# Which keys also work from any app, by command name. Leave it empty to have none.
+# global = waiting speak record prompt
+#
+# Example: a game uses Option-C, and you type accented letters with Option-Shift.
+# mode = k
+# global_modifier = ctrl + alt + cmd
