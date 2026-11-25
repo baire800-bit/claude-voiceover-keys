@@ -122,6 +122,8 @@ It removes only the keys and files this installer added, including the Claude bl
 
 ## Changes
 
+Version 2.1.1, 25 November 2026. Fixed B and W for Claude app version 7.37 on macOS 27. The app now shows the sessions in the sidebar as links instead of buttons, so B said nothing and W found no sessions. To update, run the installer again.
+
 Version 2.1, 17 November 2026. Fixed for Claude app version 5.11 on macOS 27. W read every session as idle and included the sidebar's own buttons and the session rail; it now groups sessions properly again. B landed on New instead of the session you're in. C and O had stopped working because the app renamed Chat and Cowork to Claude, and Routines to Scheduled. H now says the session's folder again. I adds how much of the context is used. R no longer gets stuck saying "Stopped" without recording after VoiceOver restarts. New: choose your own keys and modifiers in keys.conf, and bash install.sh --check to hear your keys, find clashes and test that every key works. The installer also warns when another key-catching program is running. To update, run the installer again.
 
 Version 2.0, 15 November 2026. The installer now offers hotkeys through the free skhd program, as well as VoiceOver's Option key commands. With hotkeys, Option plus a letter works only in Claude, so other apps keep their own Option keys, and either Option key works. Option-Shift with W, L, R or P works from any app. If you already have version 1, run the installer again and choose hotkeys. It moves your keys over and removes the old Option key commands. To stay as you are, choose VoiceOver Option keys.

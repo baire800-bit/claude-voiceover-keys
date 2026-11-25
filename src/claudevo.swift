@@ -106,7 +106,7 @@ func rowInfo(_ b: AXUIElement) -> (name: String, status: String) {
     }
     return (title, "")
 }
-let sessionButtons = flat.filter { str($0, kAXRoleAttribute) == "AXButton" && classes($0).contains("w-full")
+let sessionButtons = flat.filter { ["AXButton", "AXLink"].contains(str($0, kAXRoleAttribute)) && classes($0).contains("w-full")
     && (moreOptions.isEmpty ? !["New", "Search", "Projects Beta", "Artifacts", "Routines", "Scheduled", "Plugins", "Customize", "Pinned"].contains(str($0, kAXTitleAttribute))
         : moreOptions.contains(rowInfo($0).name)) }
 let modeRadios = flat.filter { str($0, kAXRoleAttribute) == "AXRadioButton" && ["Chat and Cowork", "Claude", "Chat", "Code"].contains(str($0, kAXDescriptionAttribute)) }
